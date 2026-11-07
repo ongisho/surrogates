@@ -1,0 +1,101 @@
+{
+  "source": "https://raw.githubusercontent.com/henkuailederen/Multi-topology-Dataset/main/",
+  "samples": [
+    {
+      "split": "TrainData",
+      "topology": "Mask_3P6P_V1",
+      "mask_id": "000",
+      "Pigbt": "150",
+      "Pfwd": "100",
+      "h_value": "2000",
+      "h_normalized": "0.20000000298023224",
+      "n_instances": "4",
+      "bytes": "242814",
+      "path": "TrainData/Mask_3P6P_V1/000_Pigbt150_Pfwd100_h2000/data.h5"
+    },
+    {
+      "split": "TrainData",
+      "topology": "Mask_3P6P_V2",
+      "mask_id": "038",
+      "Pigbt": "350",
+      "Pfwd": "150",
+      "h_value": "8000",
+      "h_normalized": "0.800000011920929",
+      "n_instances": "4",
+      "bytes": "248105",
+      "path": "TrainData/Mask_3P6P_V2/038_Pigbt350_Pfwd150_h8000/data.h5"
+    },
+    {
+      "split": "TrainData",
+      "topology": "Mask_HB_V2",
+      "mask_id": "075",
+      "Pigbt": "150",
+      "Pfwd": "150",
+      "h_value": "4000",
+      "h_normalized": "0.4000000059604645",
+      "n_instances": "4",
+      "bytes": "244020",
+      "path": "TrainData/Mask_HB_V2/075_Pigbt150_Pfwd150_h4000/data.h5"
+    },
+    {
+      "split": "TrainData",
+      "topology": "Mask_HB_V3-0",
+      "mask_id": "158",
+      "Pigbt": "450",
+      "Pfwd": "150",
+      "h_value": "2000",
+      "h_normalized": "0.20000000298023224",
+      "n_instances": "6",
+      "bytes": "246346",
+      "path": "TrainData/Mask_HB_V3-0/158_Pigbt450_Pfwd150_h2000/data.h5"
+    },
+    {
+      "split": "ValData",
+      "topology": "Mask_3P6P_V1",
+      "mask_id": "000",
+      "Pigbt": "150",
+      "Pfwd": "100",
+      "h_value": "4000",
+      "h_normalized": "0.4000000059604645",
+      "n_instances": "4",
+      "bytes": "244928",
+      "path": "ValData/Mask_3P6P_V1/000_Pigbt150_Pfwd100_h4000/data.h5"
+    },
+    {
+      "split": "ValData",
+      "topology": "Mask_HB_V2",
+      "mask_id": "070",
+      "Pigbt": "450",
+      "Pfwd": "200",
+      "h_value": "4000",
+      "h_normalized": "0.4000000059604645",
+      "n_instances": "4",
+      "bytes": "248432",
+      "path": "ValData/Mask_HB_V2/070_Pigbt450_Pfwd200_h4000/data.h5"
+    },
+    {
+      "split": "TestData",
+      "topology": "Mask_3P6P_V1",
+      "mask_id": "000",
+      "Pigbt": "150",
+      "Pfwd": "100",
+      "h_value": "6000",
+      "h_normalized": "0.6000000238418579",
+      "n_instances": "4",
+      "bytes": "244949",
+      "path": "TestData/Mask_3P6P_V1/000_Pigbt150_Pfwd100_h6000/data.h5"
+    },
+    {
+      "split": "TestData",
+      "topology": "Mask_HB_V2",
+      "mask_id": "075",
+      "Pigbt": "350",
+      "Pfwd": "150",
+      "h_value": "8000",
+      "h_normalized": "0.800000011920929",
+      "n_instances": "4",
+      "bytes": "247031",
+      "path": "TestData/Mask_HB_V2/075_Pigbt350_Pfwd150_h8000/data.h5"
+    }
+  ]
+}
