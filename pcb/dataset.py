@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import csv
 import hashlib
 import json
 import time
@@ -22,9 +23,32 @@ FEATURE_NAMES = ("power", "chip", "ceramic", "baseplate", "copper", "h_normalize
 
 
 def discover_files(root, split):
+    """Use the upstream manifest when present; scan only unindexed datasets.
+
+    Manifest entries are not individually stat'ed on the mounted filesystem.
+    Missing files are reported by HDF5 when they are actually loaded.
+    """
     if split not in SPLITS:
         raise ValueError(f"split must be one of {SPLITS}")
-    files = sorted((Path(root) / split).rglob("data.h5"))
+    root = Path(root)
+    manifest = root / "metadata" / "manifest.csv"
+    if manifest.is_file():
+        print(f"Reading {split} filenames from {manifest}", flush=True)
+        files = []
+        with manifest.open(newline="", encoding="utf-8-sig") as stream:
+            reader = csv.DictReader(stream)
+            if not reader.fieldnames or "path" not in reader.fieldnames:
+                raise ValueError(f"Missing 'path' column in {manifest}")
+            for row in reader:
+                relative = Path(row["path"])
+                if relative.is_absolute() or ".." in relative.parts:
+                    raise ValueError(f"Invalid sample path in {manifest}: {relative}")
+                if relative.parts and relative.parts[0] == split and relative.name == "data.h5":
+                    files.append(root / relative)
+        files = sorted(set(files))
+    else:
+        print(f"No metadata/manifest.csv; scanning {root / split}", flush=True)
+        files = sorted((root / split).rglob("data.h5"))
     if not files:
         raise FileNotFoundError(f"No data.h5 under {Path(root) / split}")
     return files
