@@ -9,6 +9,9 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from pathlib import Path
+import hashlib
+import json
+import time
 import h5py
 import numpy as np
 import torch
@@ -35,19 +38,48 @@ class NormalizationStats:
     temperature_std: float
 
     @classmethod
-    def fit(cls, train_files):
-        """Stream full training fields; never load the dataset into RAM.
+    def fit(cls, train_files, max_files=None, seed=42, cache_path=None, progress_every=100):
+        """Stream training fields, optionally using a reproducible file subset.
 
         Only accept official training paths to prevent accidental split leakage.
-        Population moments are merged stably across files.
+        None uses every file; max_files estimates moments from at most that many
+        uniformly sampled files. Every pixel in each selected file is used.
+        Cache identity includes selection, file paths, sizes and modification times.
         """
-        train_files = list(map(Path, train_files))
+        train_files = sorted(map(Path, train_files))
         if not train_files or any("TrainData" not in p.parts for p in train_files):
             raise ValueError("Fit statistics using nonempty TrainData files only.")
+        if max_files is not None:
+            if not isinstance(max_files, int) or max_files < 1:
+                raise ValueError("max_files must be a positive integer or None")
+            if len(train_files) > max_files:
+                indices = np.sort(np.random.default_rng(seed).choice(len(train_files), max_files, replace=False))
+                train_files = [train_files[i] for i in indices]
+        fingerprint = None
+        if cache_path is not None:
+            cache_path = Path(cache_path)
+            identity = []
+            for path in train_files:
+                info = path.stat()
+                identity.append((str(path.resolve()), info.st_size, info.st_mtime_ns))
+            fingerprint = hashlib.sha256(json.dumps([1, identity]).encode()).hexdigest()
+            if cache_path.is_file():
+                try:
+                    cached = json.loads(cache_path.read_text())
+                    if cached["fingerprint"] == fingerprint:
+                        stats = cls(**cached["stats"])
+                        values = list(stats.to_dict().values())
+                        if np.isfinite(values).all() and stats.power_std > 0 and stats.temperature_std > 0:
+                            print(f"Loaded normalization cache: {cache_path}", flush=True)
+                            return stats
+                except (ValueError, TypeError, KeyError):
+                    pass  # Recompute an obsolete or incomplete cache.
+        print(f"Fitting normalization on {len(train_files)} training files...", flush=True)
+        started = time.monotonic()
         counts = [0, 0]
         means = [0., 0.]
         m2s = [0., 0.]
-        for path in train_files:
+        for index, path in enumerate(train_files, 1):
             with h5py.File(path, "r") as f:
                 for i, key in enumerate(("power_map", "temperature")):
                     a = np.asarray(f[key], dtype=np.float64)
@@ -59,8 +91,18 @@ class NormalizationStats:
                     m2s[i] += n * var + delta**2 * counts[i] * n / total
                     means[i] += delta * n / total
                     counts[i] = total
+            if progress_every and (index % progress_every == 0 or index == len(train_files)):
+                print(f"Normalization: {index}/{len(train_files)} files, "
+                      f"{time.monotonic() - started:.1f}s", flush=True)
         stds = [max((v / n)**0.5, 1e-8) for v, n in zip(m2s, counts)]
-        return cls(means[0], stds[0], means[1], stds[1])
+        stats = cls(means[0], stds[0], means[1], stds[1])
+        if cache_path is not None:
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = cache_path.with_suffix(cache_path.suffix + ".tmp")
+            temporary.write_text(json.dumps({"fingerprint": fingerprint,
+                                             "n_files": len(train_files), "stats": stats.to_dict()}, indent=2))
+            temporary.replace(cache_path)
+        return stats
 
     def to_dict(self):
         return asdict(self)
