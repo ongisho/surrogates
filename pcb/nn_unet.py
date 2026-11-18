@@ -41,7 +41,7 @@ class PCBImageDataset(Dataset):
 
 
 class NNUNetRegressor(nn.Module):
-    """Official PlainConvUNet with one unrestricted continuous output channel.
+    """Official plain or residual-encoder U-Net with continuous output channels.
 
     Input: [B,8,H,W]. Output: [B,1,H,W]. There is no softmax or sigmoid.
     Deep supervision is disabled so the packaged network returns one tensor.
@@ -49,7 +49,8 @@ class NNUNetRegressor(nn.Module):
 
     def __init__(self, input_channels=8, out_channels=1,
                  features_per_stage=(32, 64, 128, 256, 320),
-                 n_conv_per_stage=2, n_conv_per_stage_decoder=2):
+                 n_conv_per_stage=2, n_conv_per_stage_decoder=2,
+                 architecture="plain", n_blocks_per_stage=None):
         super().__init__()
         from nnunetv2.utilities.get_network_from_plans import get_network_from_plans
 
@@ -60,22 +61,37 @@ class NNUNetRegressor(nn.Module):
             raise ValueError("Channel counts must be positive")
         if n_conv_per_stage < 1 or n_conv_per_stage_decoder < 1:
             raise ValueError("Convolution counts must be positive")
+        if architecture not in ("plain", "resenc"):
+            raise ValueError("architecture must be 'plain' or 'resenc'")
         self.input_channels = input_channels
+        self.architecture = architecture
         self.divisor = 2 ** (len(features) - 1)
+        architecture_kwargs = dict(
+            n_stages=len(features), features_per_stage=features,
+            conv_op="torch.nn.Conv2d", kernel_sizes=[[3, 3]] * len(features),
+            strides=[[1, 1]] + [[2, 2]] * (len(features) - 1),
+            n_conv_per_stage_decoder=[n_conv_per_stage_decoder] * (len(features) - 1),
+            conv_bias=True, norm_op="torch.nn.InstanceNorm2d",
+            norm_op_kwargs=dict(eps=1e-5, affine=True),
+            dropout_op=None, dropout_op_kwargs=None,
+            nonlin="torch.nn.LeakyReLU",
+            nonlin_kwargs=dict(negative_slope=1e-2, inplace=True),
+        )
+        if architecture == "plain":
+            if n_blocks_per_stage is not None:
+                raise ValueError("n_blocks_per_stage applies only to the residual encoder")
+            class_name = "PlainConvUNet"
+            architecture_kwargs["n_conv_per_stage"] = [n_conv_per_stage] * len(features)
+        else:
+            class_name = "ResidualEncoderUNet"
+            blocks = [1] * len(features) if n_blocks_per_stage is None else list(n_blocks_per_stage)
+            if len(blocks) != len(features) or any(not isinstance(v, int) or v < 1 for v in blocks):
+                raise ValueError("Provide one positive residual-block count per encoder stage")
+            # Each upstream BasicBlockD has two main-path convolutions.
+            architecture_kwargs["n_blocks_per_stage"] = blocks
         self.network = get_network_from_plans(
-            arch_class_name="dynamic_network_architectures.architectures.unet.PlainConvUNet",
-            arch_kwargs=dict(
-                n_stages=len(features), features_per_stage=features,
-                conv_op="torch.nn.Conv2d", kernel_sizes=[[3, 3]] * len(features),
-                strides=[[1, 1]] + [[2, 2]] * (len(features) - 1),
-                n_conv_per_stage=[n_conv_per_stage] * len(features),
-                n_conv_per_stage_decoder=[n_conv_per_stage_decoder] * (len(features) - 1),
-                conv_bias=True, norm_op="torch.nn.InstanceNorm2d",
-                norm_op_kwargs=dict(eps=1e-5, affine=True),
-                dropout_op=None, dropout_op_kwargs=None,
-                nonlin="torch.nn.LeakyReLU",
-                nonlin_kwargs=dict(negative_slope=1e-2, inplace=True),
-            ),
+            arch_class_name=f"dynamic_network_architectures.architectures.unet.{class_name}",
+            arch_kwargs=architecture_kwargs,
             arch_kwargs_req_import=["conv_op", "norm_op", "dropout_op", "nonlin"],
             input_channels=input_channels, output_channels=out_channels,
             allow_init=True, deep_supervision=False,
